@@ -314,25 +314,20 @@ function test()
     
     re = RopeEncoder(k=barlen, s=4, m=1, c=4)
     # bindex = encode_all(re, df, bins, allseqs)
-    # save(bindex, "data/bindexs3.bin")
     bindex = load("data/bindex.bin") |> CuArray
     cindex_sp = SplitComplexMatrix(ComplexF16.(bindex))
 
-    nbins = nrow(bins)
-    # found = ones(Bool, nbins)
-    sres = zeros(10)
-    for _ in 1:2
+    found = ones(Bool, nbins)
+    for _ in 1:10
         query = gen_query(bins)
-        res, f = search(re, query, cindex_sp, nbatch=2^16, ktopk=10)
-        # found .&= f 
-        sres += [sum(res[1:i])/nbins for i=1:10]
+        res, f = search(re, query, cindex_sp)
+        found .&= f 
     end
-    sres/=2
 
     @show sum(found)/nbins
 
 
-
+        
     # res = search(re, query, cindex_sp)
 
     # sres = [sum(res[1:i])/nbins for i=1:ktopk]

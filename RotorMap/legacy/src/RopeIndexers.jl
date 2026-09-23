@@ -5,7 +5,6 @@ module RopeIndexers
 export RopeIndexer, index_m1_cuda, index_m1_cuda_optimized
 export index_m1_cuda_nobatch, index_m1_cuda_v2, index_m1_cuda_v2_t, index_m1_cuda_new
 export index_cuda_best!, index_cuda_best_new!, index_cuda_final
-export select_kmers
 
 using CUDA
 using Base.Threads
