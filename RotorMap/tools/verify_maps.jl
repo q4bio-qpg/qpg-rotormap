@@ -13,12 +13,17 @@
 #     (maximum) k-long window overlap length over ALL that read's hits, and
 #     the same as a share of the window length k
 #
-#   julia verify_maps.jl <reads.fasta> <out.maps> [K]
+#   julia verify_maps.jl <reads.fasta|provenance.tsv> <out.maps> [K]
 #
-# K defaults to the first provenance header's `len=` (map.jl's match table
-# carries no explicit k; the index window length is what the overlap test
-# needs).  Reads absent from the provenance (plain ids, no key=val fields)
-# are skipped quietly.  The line grammar is map.jl's:
+# ARGV[1] is either the sampled reads FASTA (provenance in the headers) or a
+# standalone provenance table as written by tools/separate_provenance.jl --
+# a whitespace-separated file whose first line is the `id src start len`
+# column header (detected by the first line NOT starting with '>'), the
+# table of a batch whose reads carry no provenance at all.  K defaults to
+# the first provenance row's `len` (map.jl's match table carries no explicit
+# k; the index window length is what the overlap test needs).  Reads absent
+# from the provenance (plain ids, no key=val fields) are skipped quietly.
+# The line grammar is map.jl's:
 #     <read header> <'+'|'-'> <score> <0-based position> <record name>
 # with the read header possibly multi-token: the line is split around the
 # BARE '+'/'-' direction token, everything after the position is the record
@@ -31,34 +36,56 @@ using Printf
 
 function main()
     # ---- the provenance table: read id -> (src record name, 1-based start, len)
+    # ARGV[1]: the sampled reads FASTA (headers) OR a standalone provenance
+    # table (separate_provenance.jl's .tsv) -- detected by the first line
+    # starting with '>' or not
     prov = Dict{String, Tuple{String, Int, Int}}()
-    for line in eachline(ARGS[1])
-        startswith(line, ">") || continue
-        toks = split(strip(line[2:end]), " "; keepempty = false)
-        id = String(toks[1]) # the bare id token (sample format)
-        src = ""; start = 0; len = 0
-        for t in toks[2:end]
-            kv = split(t, "="; limit = 2)
-            length(kv) == 2 || continue
-            kv[1] == "id" && (id = String(kv[2]))
-            kv[1] == "src" && (src = String(kv[2]))
-            kv[1] == "start" && (start = parse(Int, kv[2]))
-            kv[1] == "len" && (len = parse(Int, kv[2]))
+    firstline = open(ARGS[1]) do io
+        readline(io)
+    end
+    if startswith(firstline, ">")
+        for line in eachline(ARGS[1])
+            startswith(line, ">") || continue
+            toks = split(strip(line[2:end]), " "; keepempty = false)
+            id = String(toks[1]) # the bare id token (sample format)
+            src = ""; start = 0; len = 0
+            for t in toks[2:end]
+                kv = split(t, "="; limit = 2)
+                length(kv) == 2 || continue
+                kv[1] == "id" && (id = String(kv[2]))
+                kv[1] == "src" && (src = String(kv[2]))
+                kv[1] == "start" && (start = parse(Int, kv[2]))
+                kv[1] == "len" && (len = parse(Int, kv[2]))
+            end
+            if start == 0 && src == "" && occursin(":", id)
+                # the eval flow's colon provenance: >acc:0-based-start:rc[#dup]
+                # (the reads/sample.jl parser's format 2: read length unknown
+                # -- the reader trims every record to exactly k, so the
+                # mapped fragment is the db window at start; the optional
+                # trailing #<n> duplicate-locus marker is ignored; start is
+                # 0-based)
+                f = split(id, ":")
+                length(f) == 3 || continue
+                s0 = tryparse(Int, f[2])
+                s0 === nothing && continue
+                src = String(f[1])
+                start = s0 + 1
+            end
+            (start > 0 || src != "") && (prov[id] = (src, start, len))
         end
-        if start == 0 && src == "" && occursin(":", id)
-            # the eval flow's colon provenance: >acc:0-based-start:rc[#dup]
-            # (the reads/sample.jl parser's format 2: read length unknown --
-            # the reader trims every record to exactly k, so the mapped
-            # fragment is the db window at start; the optional trailing
-            # #<n> duplicate-locus marker is ignored; start is 0-based)
-            f = split(id, ":")
-            length(f) == 3 || continue
-            s0 = tryparse(Int, f[2])
-            s0 === nothing && continue
-            src = String(f[1])
-            start = s0 + 1
+    else
+        # the standalone table: `id src start len` rows (the column-header
+        # row starts with `id` and is skipped)
+        for line in eachline(ARGS[1])
+            isempty(strip(line)) && continue
+            occursin(r"^id[ \t]", line) && continue
+            f = split(line)
+            length(f) >= 3 || continue
+            start = tryparse(Int, f[3])
+            start === nothing && continue
+            len = length(f) >= 4 ? (l = tryparse(Int, f[4]); l === nothing ? 0 : l) : 0
+            (start > 0 || f[2] != "") && (prov[f[1]] = (f[2], start, len))
         end
-        (start > 0 || src != "") && (prov[id] = (src, start, len))
     end
 
     K = length(ARGS) > 2 ? parse(Int, ARGS[3]) :

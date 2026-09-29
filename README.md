@@ -6,7 +6,7 @@ applied to s-mer histograms) and a **batched GPU GEMM + top-k** search,
 instead of classic seed-and-extend alignment. Everything here is Julia +
 CUDA.jl, organized as a layered *workbench* (there is no package to
 `using RotorMap` — scripts `include` the layers they need in a fixed order,
-see `RotorMap/README.md`).
+see `RotorMap/ARCHITECTURE.md`).
 
 ```
  reference.fasta ─┬─► index/      rope-encode sliding windows (fwd + revcomp) → index .bin
@@ -69,7 +69,7 @@ Notes:
   dependency resolution (`julia --project=RotorMap …`). Code is assembled by
   plain `include` in a fixed topological order; every experiment/tool file
   starts with the include prefix it needs. Two rules from
-  `RotorMap/README.md`: include each layer file **at most once per session**,
+  `RotorMap/ARCHITECTURE.md`: include each layer file **at most once per session**,
   and **never co-include** `search/engine_fp16.jl` with `search/engine_fp8.jl`
   (nor `engine_complex.jl` with either) — they intentionally define clashing
   names.
@@ -365,6 +365,26 @@ Measured on kau (RTX 5090, k = 20,000, kstep = 2,000 fixture): 500 mutated
 (err = 0.05) reads map with every top-1 hit intersecting the true locus
 (fp8 resident path, ≈ 7 s wall).
 
+**Separating the provenance from the reads** — when the reads must carry NO
+provenance (like a real sequencer batch), `RotorMap/tools/separate_provenance.jl`
+splits a §3.2 sampled batch into a plain reads FASTA (headers reduced to the
+bare read id, sequences copied byte-for-byte) and a standalone provenance
+table, which `verify_maps.jl` accepts in place of the reads FASTA:
+
+```bash
+julia --project=RotorMap RotorMap/tools/separate_provenance.jl \
+      <reads.fasta> [outprefix]    # -> <prefix>.plain.fasta
+                                    # -> <prefix>.provenance.tsv  (id src start len)
+
+julia --project=RotorMap RotorMap/tools/verify_maps.jl \
+      <prefix>.provenance.tsv <prefix>.plain.fasta.maps [K]
+```
+
+The table's first line is the `id src start len` column header (that's how
+the tool tells it from a `>`-headed fasta); both §3.6 provenance formats are
+handled (the sample id `read_<i>` is kept, a colon header — which IS the
+provenance — gets a synthesized `r<i>` id).
+
 Further experimental flows (`RotorMap/experiments/`) keep the provenance-
 scoring e2e harness with stats: `e2e_compact.jl` (fp8 compact),
 `e2e_compact16.jl` (fp16 compact, pre-fp8 GPUs), `e2e_auto.jl`
@@ -468,18 +488,3 @@ header's first whitespace token, sans `>`) , or the
   colon eval format `>ACCESSION:<0-based start>:<true|false>` (reverse-
   complement flag; length trimmed by the reader). Both are parsed by
   `parse_read_head` (RotorMap/reads/provenance.jl).
-
-
-# Citation
-
-```
-@misc{yakymenko2026rotormapquantumfingerprintsdna,
-      title={RotorMap and Quantum Fingerprints of DNA Sequences via Rotary Position Embeddings}, 
-      author={Danylo Yakymenko and Maksym Chernyshev and Illia Savchenko and Sergii Strelchuk},
-      year={2026},
-      eprint={2603.22245},
-      archivePrefix={arXiv},
-      primaryClass={quant-ph},
-      url={https://arxiv.org/abs/2603.22245}, 
-}
-```

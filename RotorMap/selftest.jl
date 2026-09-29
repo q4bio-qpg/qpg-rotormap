@@ -37,7 +37,7 @@
 #   CUDA must be functional (the index + mapping layers are GPU-only).  The
 #   numeric GEMM path is picked from the device's compute capability BEFORE
 #   any layer is included -- search/engine_fp8.jl and search/engine_fp16.jl
-#   are NOT co-includable (RotorMap/README.md's one-variant rule):
+#   are NOT co-includable (RotorMap/ARCHITECTURE.md's one-variant rule):
 #     cc >= 8.9 (Ada RTX 40xx), 9.0 (Hopper) or 12.x (Blackwell RTX 50xx)
 #       -> the fp8 flow (e4m3 database, cuBLASLt `:lt` engine; the
 #          production path on the RTX 5090);

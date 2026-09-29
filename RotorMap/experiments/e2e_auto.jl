@@ -9,7 +9,7 @@
 #       w = 2^15).
 # The decision MUST precede the includes: search/engine_fp8.jl and
 # search/engine_fp16.jl are NOT co-includable (the one-variant rule, see
-# RotorMap/README.md) -- the same stage-0 dispatch selftest.jl uses.  And
+# RotorMap/ARCHITECTURE.md) -- the same stage-0 dispatch selftest.jl uses.  And
 # exactly like selftest.jl, the whole variant script is included WHOLESALE:
 # it owns its canonical layered include list AND its run entry points
 # (run_e2e_compact{,16}{,_test}; its own main() stays dormant -- the
