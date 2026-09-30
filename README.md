@@ -488,3 +488,17 @@ header's first whitespace token, sans `>`) , or the
   colon eval format `>ACCESSION:<0-based start>:<true|false>` (reverse-
   complement flag; length trimmed by the reader). Both are parsed by
   `parse_read_head` (RotorMap/reads/provenance.jl).
+
+# Citation
+
+```
+@misc{yakymenko2026rotormapquantumfingerprintsdna,
+      title={RotorMap and Quantum Fingerprints of DNA Sequences via Rotary Position Embeddings}, 
+      author={Danylo Yakymenko and Maksym Chernyshev and Illia Savchenko and Sergii Strelchuk},
+      year={2026},
+      eprint={2603.22245},
+      archivePrefix={arXiv},
+      primaryClass={quant-ph},
+      url={https://arxiv.org/abs/2603.22245}, 
+}
+```
